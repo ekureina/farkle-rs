@@ -2,20 +2,29 @@ extern crate random;
 
 use random::Source;
 use std::time::SystemTime;
+use std::io::{self, Write};
+use std::fmt;
 
 fn main() {
     let mut dice_source = get_rand();
-    let dice_rolls = roll_dice(&mut dice_source, 6, 6);
-    for die in dice_rolls.iter() {
-        println!("{}", die);
+    println!("Welcome to Farkle!");
+    let mut players = get_players(get_num_players());
+    while !is_game_over(&players) {
+        for player in players.iter_mut() {
+            println!("{} ({})", player, player.on_board());
+            let dice_rolls = roll_dice(&mut dice_source, 6, 6);
+            for die in dice_rolls.iter() {
+                print!("{} ", die);
+            }
+            player.score += get_points(dice_rolls, player.on_board(), None);
+        }
     }
-
-    println!("{}", get_points(dice_rolls));
-
 }
 
 fn get_rand() -> random::Default {
-    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap();
     random::default().seed([now.as_secs(), now.subsec_millis() as u64])
 }
 
@@ -27,40 +36,137 @@ fn roll_dice(source: &mut random::Default, side_n: u8, dice_num: usize) -> Vec<u
     dice
 }
 
-fn get_points(dice: Vec<u8>) -> u16 {
-    let mut freq = Vec::with_capacity(6);
-    for _ in 0..6 {
-        freq.push(0);
-    }
-    for element in dice.iter() {
-        freq[(element-1) as usize] += 1;
-    }
-    let mut score: u16 = 0;
-    for dots in 0..6 {
-        if dots == 0 && freq[0] < 4 {
-            score += 100 * freq[0];
-            continue;
+fn get_points(dice: Vec<u8>, on_board: bool, current_score: Option<u16>) -> u16 {
+    let mut score = current_score.unwrap_or(0);
+    if on_board && dice.len() == 2 {
+        let mut added: u16 = 0;
+        match dice[0] {
+            0 => added += 100,
+            4 => added += 50,
+            _ => (),
         }
-        else if dots == 4 && freq[4] < 3 {
-            score += 50 * freq[4];
-            continue;
+        match dice[1] {
+            0 => added += 100,
+            4 => added += 50,
+            _ => (),
         }
-        else if freq[dots] == 3 {
-            score += 100 * (dots+1) as u16;
-            continue;
+        match added {
+            0 => return 0,
+            _ => return score * 2 + added,
         }
-        else if freq[dots] == 4 {
-            score += 1000;
-            continue;
+    } else if on_board && dice.len() == 1 {
+        match dice[0] {
+            0 => return score * 3 + 100,
+            4 => return score * 3 + 50,
+            _ => return 0,
         }
-        else if freq[dots] == 5 {
-            score += 2000;
-            continue;
+    } else {
+        let mut freq = vec![0; 6];
+        for die in dice.iter() {
+            freq[(die - 1) as usize] += 1;
         }
-        else if freq[dots] == 6 {
-            score += 3000;
-            break;
+        let mut doubles: Vec<u8> = Vec::with_capacity(3);
+        let mut triples: Vec<u8> = Vec::with_capacity(2);
+        let mut singles: Vec<u8> = Vec::with_capacity(6);
+        for dots in 0..6 {
+            match freq[dots] {
+                1 => singles.push(dots as u8),
+                2 => doubles.push(dots as u8),
+                3 => triples.push(dots as u8),
+                4 => score += 1000,
+                5 => score += 2000,
+                6 => score += 3000,
+                _ => (),
+            }
+        }
+        if score == 0 && dice.len() == 6 {
+            if doubles.len() == 3 {
+                score = 1500;
+            } else if triples.len() == 2 {
+                score = 2500;
+            } else if singles.len() == 6 {
+                score = 1500;
+            } else {
+                for triple in triples.iter() {
+                    score += 100 * (triple + 1) as u16;
+                }
+                if freq[0] <= 3 {
+                    score += 100 * freq[0];
+                    if freq[0] == 3 {
+                        score -= 100
+                    }
+                }
+                if freq[4] < 3 {
+                    score += 50 * freq[4];
+                }
+            }
+        } else {
+            for triple in triples.iter() {
+                score += 100 * (triple + 1) as u16;
+            }
+            if freq[0] <= 3 {
+                score += 100 * freq[0];
+                if freq[0] == 3 {
+                    score -= 100
+                }
+            }
+            if freq[4] < 3 {
+                score += 50 * freq[4];
+            }
         }
     }
     score
+}
+
+fn get_num_players() -> usize {
+    let mut player_num = String::new();
+    print!("How many players?: ");
+    io::stdout().flush().unwrap();
+    io::stdin().read_line(&mut player_num).expect("Bad input!");
+    player_num.trim().parse().expect("Not a number!")
+}
+
+fn get_players(player_number: usize) -> Vec<Player> {
+    let mut players = Vec::<Player>::with_capacity(player_number);
+    for num in 0..player_number {
+        let mut player_name = String::new();
+        print!("What is Player #{}'s Name?: ", (num+1));
+        io::stdout().flush().unwrap();
+        io::stdin().read_line(&mut player_name).expect("Please input a player name.");
+        players.push(Player::new(player_name.trim()));
+    }
+    players
+}
+
+fn is_game_over(players: &[Player]) -> bool {
+    for player in players.iter() {
+        if player.score >= 10000 {
+            return true;
+        }
+    }
+    false
+}
+
+struct Player {
+    name: String,
+    score: u16,
+}
+
+impl Player {
+    pub fn new(player_name: &str) -> Player {
+        Player {
+            name: player_name.to_string(),
+            score: 0,
+        }
+    }
+
+    pub fn on_board(&self) -> bool {
+        self.score >= 500
+    }
+}
+
+impl fmt::Display for Player {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}: {}", self.name, self.score)
+    }
 }
