@@ -1,9 +1,9 @@
 extern crate random;
 
 use random::Source;
-use std::time::SystemTime;
-use std::io::{self, Write};
 use std::fmt;
+use std::io::{self, Write};
+use std::time::SystemTime;
 
 fn main() {
     let mut dice_source = get_rand();
@@ -11,13 +11,55 @@ fn main() {
     let mut players = get_players(get_num_players());
     while !is_game_over(&players) {
         for player in players.iter_mut() {
-            let dice_rolls = roll_dice(&mut dice_source, 6, 6);
-            for die in dice_rolls.iter() {
-                print!("{} ", die);
+            let mut dice_num: usize = 6;
+            let mut round_score = 0;
+            let mut re_roll = true;
+            println!("{}'s Turn!\nCurrent Score: {}", player, player.score);
+            while (!player.on_board() && round_score < 500) || re_roll == true {
+                println!("Dice Roll:");
+                let dice_rolls = roll_dice(&mut dice_source, 6, dice_num);
+                for die in dice_rolls.iter() {
+                    print!("{} ", die);
+                }
+                let mut score_dice = String::new();
+                print!("\nWhich Dice to Use: ");
+                io::stdout().flush().unwrap();
+                io::stdin()
+                    .read_line(&mut score_dice)
+                    .expect("Please Enter the Dice");
+                if score_dice.trim() == "" {
+                    round_score = 0;
+                    break;
+                }
+                let mut scoring_dice = Vec::<u8>::with_capacity(dice_num);
+                for die in score_dice.split_whitespace() {
+                    scoring_dice.push(die.parse().expect("NaN"));
+                }
+                round_score = score_roll(
+                    &scoring_dice,
+                    player.on_board(),
+                    round_score,
+                    dice_rolls.len() as u8,
+                );
+                if round_score == 0 {
+                    break;
+                }
+                dice_num -= scoring_dice.len();
+                println!("Score this round: {}", round_score);
+                if player.on_board() || round_score >= 500 {
+                    let mut should_re_roll = String::new();
+                    print!("Roll Again?: ");
+                    io::stdout().flush().unwrap();
+                    io::stdin()
+                        .read_line(&mut should_re_roll)
+                        .expect("Bad Answer");
+                    re_roll = should_re_roll.trim().to_lowercase() == "y";
+                }
+                if dice_num == 0 {
+                    dice_num = 6;
+                }
             }
-            println!("");
-            player.score += score_roll(&dice_rolls, player.on_board(), None);
-            println!("{} ({})", player, player.on_board());
+            player.score += round_score;
         }
     }
     for player in players.iter() {
@@ -40,28 +82,25 @@ fn roll_dice(source: &mut random::Default, side_n: u8, dice_num: usize) -> Vec<u
     dice
 }
 
-fn score_roll(dice: &[u8], on_board: bool, current_score: Option<u16>) -> u16 {
-    let mut score = current_score.unwrap_or(0);
-    if on_board && dice.len() == 2 {
+fn score_roll(dice: &[u8], on_board: bool, current_score: u16, rolled_dice: u8) -> u16 {
+    let mut score = current_score;
+    if on_board && rolled_dice == 2 {
         let mut added: u16 = 0;
-        match dice[0] {
-            0 => added += 100,
-            4 => added += 50,
-            _ => (),
-        }
-        match dice[1] {
-            0 => added += 100,
-            4 => added += 50,
-            _ => (),
+        for die in dice.iter() {
+            match die {
+                1 => added += 100,
+                5 => added += 50,
+                _ => (),
+            }
         }
         match added {
             0 => return 0,
-            _ => return score * 2 + added,
+            _ => return current_score * 2 + added,
         }
-    } else if on_board && dice.len() == 1 {
+    } else if on_board && rolled_dice == 1 {
         match dice[0] {
-            0 => return score * 3 + 100,
-            4 => return score * 3 + 50,
+            1 => return current_score * 3 + 100,
+            5 => return current_score * 3 + 50,
             _ => return 0,
         }
     } else {
@@ -134,9 +173,11 @@ fn get_players(player_number: usize) -> Vec<Player> {
     let mut players = Vec::<Player>::with_capacity(player_number);
     for num in 0..player_number {
         let mut player_name = String::new();
-        print!("What is Player #{}'s Name?: ", (num+1));
+        print!("What is Player #{}'s Name?: ", (num + 1));
         io::stdout().flush().unwrap();
-        io::stdin().read_line(&mut player_name).expect("Please input a player name.");
+        io::stdin()
+            .read_line(&mut player_name)
+            .expect("Please input a player name.");
         players.push(Player::new(player_name.trim()));
     }
     players
@@ -171,6 +212,6 @@ impl Player {
 
 impl fmt::Display for Player {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}: {}", self.name, self.score)
+        write!(f, "{}", self.name)
     }
 }
