@@ -1,12 +1,11 @@
-extern crate random;
+extern crate rand;
 
-use random::Source;
+use rand::distributions::{Distribution, Uniform};
 use std::fmt;
 use std::io::{self, Write};
-use std::time::SystemTime;
 
 fn main() {
-    let mut dice_source = get_rand();
+    let dice_distribution = get_distribution(6);
     println!("Welcome to Farkle!");
     let mut players = get_players(get_num_players());
     while !is_game_over(&players) {
@@ -17,7 +16,7 @@ fn main() {
             println!("{}'s Turn!\nCurrent Score: {}", player, player.score);
             while (!player.on_board() && round_score < 500) || re_roll == true {
                 println!("Dice Roll:");
-                let dice_rolls = roll_dice(&mut dice_source, 6, dice_num);
+                let dice_rolls = roll_dice(&dice_distribution, dice_num);
                 for die in dice_rolls.iter() {
                     print!("{} ", die);
                 }
@@ -67,17 +66,15 @@ fn main() {
     }
 }
 
-fn get_rand() -> random::Default {
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap();
-    random::default().seed([now.as_secs(), now.subsec_millis() as u64])
+fn get_distribution(die_sides: u8) -> Uniform<u8> {
+    Uniform::new_inclusive(1, die_sides)
 }
 
-fn roll_dice(source: &mut random::Default, side_n: u8, dice_num: usize) -> Vec<u8> {
-    let mut dice = source.iter().take(dice_num).collect::<Vec<u8>>();
-    for i in 0..dice_num {
-        dice[i] = dice[i] % side_n + 1;
+fn roll_dice(distribution: &Uniform<u8>, dice_num: usize) -> Vec<u8> {
+    let mut dice = Vec::<u8>::with_capacity(dice_num);
+    let mut rng = rand::thread_rng();
+    for _ in 0..dice_num {
+        dice.push(distribution.sample(&mut rng));
     }
     dice
 }

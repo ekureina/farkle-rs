@@ -4,4 +4,4 @@ version = "0.1.0"
 authors = ["Claire Moore <nrmoore@uci.edu>"]
 
 [dependencies]
-random = "0.12.2"
+rand = "0.5.5"
