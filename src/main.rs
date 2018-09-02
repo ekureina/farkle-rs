@@ -11,13 +11,17 @@ fn main() {
     let mut players = get_players(get_num_players());
     while !is_game_over(&players) {
         for player in players.iter_mut() {
-            println!("{} ({})", player, player.on_board());
             let dice_rolls = roll_dice(&mut dice_source, 6, 6);
             for die in dice_rolls.iter() {
                 print!("{} ", die);
             }
-            player.score += get_points(dice_rolls, player.on_board(), None);
+            println!("");
+            player.score += score_roll(&dice_rolls, player.on_board(), None);
+            println!("{} ({})", player, player.on_board());
         }
+    }
+    for player in players.iter() {
+        println!("{}", player);
     }
 }
 
@@ -36,7 +40,7 @@ fn roll_dice(source: &mut random::Default, side_n: u8, dice_num: usize) -> Vec<u
     dice
 }
 
-fn get_points(dice: Vec<u8>, on_board: bool, current_score: Option<u16>) -> u16 {
+fn score_roll(dice: &[u8], on_board: bool, current_score: Option<u16>) -> u16 {
     let mut score = current_score.unwrap_or(0);
     if on_board && dice.len() == 2 {
         let mut added: u16 = 0;
