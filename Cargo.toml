@@ -1,0 +1,7 @@
+[package]
+name = "farkle"
+version = "0.1.0"
+authors = ["Claire Moore <nrmoore@uci.edu>"]
+
+[dependencies]
+random = "0.12.2"
