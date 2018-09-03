@@ -16,34 +16,34 @@ fn main() {
             println!("{}'s Turn!\nCurrent Score: {}", player, player.score);
             while (!player.on_board() && round_score < 500) || re_roll == true {
                 println!("Dice Roll:");
-                let dice_rolls = roll_dice(&dice_distribution, dice_num);
+                let mut dice_rolls = roll_dice(&dice_distribution, dice_num);
                 for die in dice_rolls.iter() {
                     print!("{} ", die);
                 }
-                let mut score_dice = String::new();
-                print!("\nWhich Dice to Use: ");
+                let mut scored = score_roll(&dice_rolls, player.on_board(), round_score, dice_num as u8);
+                if scored.0 == 0 {
+                    println!("\nNo Score this roll. {}'s turn over.", player);
+                    break;
+                }
+                print!("\nScore: {}\nDice Used: {}", scored.0, scored.1);
+                let mut unscore_dice = String::new();
+                print!("\nDice to not Score: ");
                 io::stdout().flush().unwrap();
                 io::stdin()
-                    .read_line(&mut score_dice)
+                    .read_line(&mut unscore_dice)
                     .expect("Please Enter the Dice");
-                if score_dice.trim() == "" {
-                    round_score = 0;
-                    break;
+                if unscore_dice.trim() != "" {
+                    for die in unscore_dice.split_whitespace() {
+                        // Use remove_item when Available
+                        match dice_rolls.iter_mut().position(|&mut roll| roll == die.parse().expect("NaN")) {
+                            Some(position) => dice_rolls.remove(position),
+                            _ => 0,
+                        };
+                    }
+                scored = score_roll(&dice_rolls, player.on_board(), round_score, dice_num as u8);
                 }
-                let mut scoring_dice = Vec::<u8>::with_capacity(dice_num);
-                for die in score_dice.split_whitespace() {
-                    scoring_dice.push(die.parse().expect("NaN"));
-                }
-                round_score = score_roll(
-                    &scoring_dice,
-                    player.on_board(),
-                    round_score,
-                    dice_rolls.len() as u8,
-                );
-                if round_score == 0 {
-                    break;
-                }
-                dice_num -= scoring_dice.len();
+                round_score = scored.0;
+                dice_num -= scored.1;
                 println!("Score this round: {}", round_score);
                 if player.on_board() || round_score >= 500 {
                     let mut should_re_roll = String::new();
@@ -79,26 +79,33 @@ fn roll_dice(distribution: &Uniform<u8>, dice_num: usize) -> Vec<u8> {
     dice
 }
 
-fn score_roll(dice: &[u8], on_board: bool, current_score: u16, rolled_dice: u8) -> u16 {
+fn score_roll(dice: &[u8], on_board: bool, current_score: u16, rolled_dice: u8) -> (u16, usize) {
     let mut score = current_score;
+    let mut used_dice = 0;
     if on_board && rolled_dice == 2 {
         let mut added: u16 = 0;
         for die in dice.iter() {
             match die {
-                1 => added += 100,
-                5 => added += 50,
+                1 => {
+                        added += 100;
+                        used_dice += 1;
+                    },
+                5 => {
+                        added += 50;
+                        used_dice += 1;
+                    },
                 _ => (),
             }
         }
         match added {
-            0 => return 0,
-            _ => return current_score * 2 + added,
+            0 => return (0, 0),
+            _ => return (current_score * 2 + added, used_dice),
         }
     } else if on_board && rolled_dice == 1 {
         match dice[0] {
-            1 => return current_score * 3 + 100,
-            5 => return current_score * 3 + 50,
-            _ => return 0,
+            1 => return (current_score * 3 + 100, 1),
+            5 => return (current_score * 3 + 50, 1),
+            _ => return (0, 0),
         }
     } else {
         let mut freq = vec![0; 6];
@@ -113,49 +120,66 @@ fn score_roll(dice: &[u8], on_board: bool, current_score: u16, rolled_dice: u8) 
                 1 => singles.push(dots as u8),
                 2 => doubles.push(dots as u8),
                 3 => triples.push(dots as u8),
-                4 => score += 1000,
-                5 => score += 2000,
-                6 => score += 3000,
+                4 => {
+                        score += 1000;
+                        used_dice += 4;
+                },
+                5 => {
+                        score += 2000;
+                        used_dice += 5;
+                },
+                6 => return (3000, 6),
                 _ => (),
             }
         }
         if score == 0 && dice.len() == 6 {
             if doubles.len() == 3 {
-                score = 1500;
+                return (1500, 6);
             } else if triples.len() == 2 {
-                score = 2500;
+                return (2500, 6);
             } else if singles.len() == 6 {
-                score = 1500;
+                return (1500, 6);
             } else {
                 for triple in triples.iter() {
                     score += 100 * (triple + 1) as u16;
+                    used_dice += 3
                 }
                 if freq[0] <= 3 {
                     score += 100 * freq[0];
+                    used_dice += freq[0] as usize;
                     if freq[0] == 3 {
-                        score -= 100
+                        score -= 100;
+                        used_dice -= 3;
                     }
                 }
                 if freq[4] < 3 {
                     score += 50 * freq[4];
+                    used_dice += freq[4] as usize;
                 }
             }
         } else {
             for triple in triples.iter() {
                 score += 100 * (triple + 1) as u16;
+                used_dice += 3;
             }
             if freq[0] <= 3 {
                 score += 100 * freq[0];
+                used_dice += freq[0] as usize;
                 if freq[0] == 3 {
-                    score -= 100
+                    score -= 100;
+                    used_dice -= 3;
                 }
             }
             if freq[4] < 3 {
                 score += 50 * freq[4];
+                used_dice += freq[4] as usize;
             }
         }
     }
-    score
+    if score == current_score {
+        return (0, 0);
+    }
+    (score, used_dice)
 }
 
 fn get_num_players() -> usize {
