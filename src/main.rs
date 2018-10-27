@@ -64,7 +64,9 @@ fn main() {
                     dice_num = 6;
                 }
             }
-            player.increment_score(round_score);
+            if re_roll == false { // Player picked to stop playing
+				player.increment_score(round_score);
+			}
         }
     }
     for player in players.iter() {
