@@ -1,8 +1,10 @@
 extern crate rand;
 
 use rand::distributions::{Distribution, Uniform};
-use std::fmt;
 use std::io::{self, Write};
+
+mod player;
+use player::Player;
 
 fn main() {
     let dice_distribution = get_distribution(6);
@@ -13,7 +15,7 @@ fn main() {
             let mut dice_num: usize = 6;
             let mut round_score = 0;
             let mut re_roll = true;
-            println!("{}'s Turn!\nCurrent Score: {}", player, player.score);
+            println!("{}'s Turn!\nCurrent Score: {}", player, player.score());
             while (!player.on_board() && round_score < 500) || re_roll == true {
                 println!("Dice Roll:");
                 let mut dice_rolls = roll_dice(&dice_distribution, dice_num);
@@ -58,7 +60,7 @@ fn main() {
                     dice_num = 6;
                 }
             }
-            player.score += round_score;
+            player.increment_score(round_score);
         }
     }
     for player in players.iter() {
@@ -206,33 +208,9 @@ fn get_players(player_number: usize) -> Vec<Player> {
 
 fn is_game_over(players: &[Player]) -> bool {
     for player in players.iter() {
-        if player.score >= 10000 {
+        if player.score() >= 10000 {
             return true;
         }
     }
     false
-}
-
-struct Player {
-    name: String,
-    score: u16,
-}
-
-impl Player {
-    pub fn new(player_name: &str) -> Player {
-        Player {
-            name: player_name.to_string(),
-            score: 0,
-        }
-    }
-
-    pub fn on_board(&self) -> bool {
-        self.score >= 500
-    }
-}
-
-impl fmt::Display for Player {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.name)
-    }
 }
