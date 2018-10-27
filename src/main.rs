@@ -27,26 +27,30 @@ fn main() {
                     println!("\nNo Score this roll. {}'s turn over.", player);
                     break;
                 }
-                print!("\nScore: {}\nDice Used: {}", scored.0, scored.1);
-                let mut unscore_dice = String::new();
-                print!("\nDice to not Score: ");
-                io::stdout().flush().unwrap();
-                io::stdin()
-                    .read_line(&mut unscore_dice)
-                    .expect("Please Enter the Dice");
-                if unscore_dice.trim() != "" {
-                    for die in unscore_dice.split_whitespace() {
-                        // Use remove_item when Available
-                        match dice_rolls.iter_mut().position(|&mut roll| roll == die.parse().expect("NaN")) {
-                            Some(position) => dice_rolls.remove(position),
-                            _ => 0,
-                        };
-                    }
-                scored = score_roll(&dice_rolls, player.on_board(), round_score, dice_num as u8);
-                }
-                round_score = scored.0;
-                dice_num -= scored.1;
-                println!("Score this round: {}", round_score);
+				print!("\nScore: {}\nDice Used: {}", scored.0, scored.1);
+				if scored.1 != 1 {
+					let mut unscore_dice = String::new();
+					print!("\nDice to not Score: ");
+					io::stdout().flush().unwrap();
+					io::stdin()
+						.read_line(&mut unscore_dice)
+						.expect("Please Enter the Dice");
+					if unscore_dice.trim() != "" {
+						for die in unscore_dice.split_whitespace() {
+							// Use remove_item when Available
+							match dice_rolls.iter_mut().position(|&mut roll| roll == die.parse().expect("NaN")) {
+								Some(position) => dice_rolls.remove(position),
+								_ => 0,
+							};
+						}
+					scored = score_roll(&dice_rolls, player.on_board(), round_score, dice_num as u8);
+					}
+				} else {
+					print!("\n");
+				}
+				round_score = scored.0;
+				dice_num -= scored.1;
+				println!("Score this round: {}", round_score);
                 if player.on_board() || round_score >= 500 {
                     let mut should_re_roll = String::new();
                     print!("Roll Again?: ");
